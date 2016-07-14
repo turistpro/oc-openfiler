@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<modification>
+  <name>Open Filter</name>
+	<code>openfilter</code>
+	<version>1.0.0</version>
+	<author>turistpro</author>
+
+  <file path="catalog/model/catalog/product.php">
+		<operation>
+			<search><![CDATA[$sql .= " LEFT JOIN " . DB_PREFIX . "product p ON (p2c.product_id = p.product_id)";]]></search>
+      <add position="after" offset="1"><![CDATA[
+			if (!empty($data['filter_groups'])) {
+				foreach (array_keys($data['filter_groups']) as $filter_group_id) {
+					$pf = "pf" . (int)$filter_group_id;
+					$sql .= " LEFT JOIN " . DB_PREFIX . "product_filter " . $pf . " ON (p2c.product_id = " . $pf . ".product_id)"; 
+				}
+			}
+			]]></add>
+		</operation>
+		<operation>
+			<search><![CDATA[$sql .= " AND pf.filter_id IN (" . implode(',', $implode) . ")";]]></search>
+      <add position="after" offset="1"><![CDATA[
+			if (!empty($data['filter_groups'])) {
+				foreach (array_keys($data['filter_groups']) as $filter_group_id) {
+					$implode = array();
+					$filters = explode(',', $data['filter_groups'][$filter_group_id]);
+
+					foreach ($filters as $filter_id) {
+						$implode[] = (int)$filter_id;
+					}
+
+					$pf = "pf" . (int)$filter_group_id;
+					$sql .= " AND " . $pf . ".filter_id in (" . implode(',', $implode) . ")";
+				}
+			}]]></add>
+		</operation>
+	</file>
+  <file path="catalog/controller/product/category.php">
+		<operation>
+			<search><![CDATA[$filter = '';]]></search>
+      <add position="after" offset="1"><![CDATA[
+		$filter_keys = array_keys($this->request->get);
+		$filter_groups=[];
+		foreach ($filter_keys as $key) {
+			$this->log->write($key);
+			if (preg_match("/filter-group([0-9]+)/", $key, $re) == 1) {
+				if ($this->request->get[$key]!="") {
+					$filter_groups[$re[1]]=$this->request->get[$key];
+					$filter .= $this->request->get[$key] . ',';
+				}
+			}
+		}]]></add>
+		</operation>
+    <operation>
+			<search><![CDATA[$url .= '&filter=' . $this->request->get['filter'];]]></search>
+      <add position="after" offset="1"><![CDATA[
+			foreach ($filter_keys as $key) {
+				$this->log->write('filter: ' . $key);
+				if (preg_match("/filter-group([0-9]+)/", $key) == 1) {
+					if ($this->request->get[$key]!="") {
+						$url .= '&' . $key . '=' . $this->request->get[$key];
+						$this->log->write($url);
+					}
+				}
+			}]]></add>
+		</operation>
+		<operation>
+			<search><![CDATA['limit'              => $limit]]></search>
+      <add position="replace"><![CDATA['limit'              => $limit,
+                                'filter_groups'      => $filter_groups]]></add>
+		</operation>
+	</file>
+  <file path="catalog/controller/module/filter.php">
+		<operation>
+			<search><![CDATA[$data['filter_category'] = array();]]></search>
+      <add position="after" offset="1"><![CDATA[
+			$keys = array_keys($this->request->get);
+			$filter='';
+			foreach ($keys as $key) {
+				if (preg_match("/filter-group([0-9]+)/", $key, $re) == 1) {
+					if ($this->request->get[$key]!="") {
+						$filter .= $this->request->get[$key] . ',';
+					}
+				}
+			}
+			$filters = explode(',', $filter);
+			foreach($filters as $filter) {
+				$data['filter_category'][] = $filter;
+			}]]></add>
+		</operation>
+	</file>
+  <file path="catalog/view/theme/*/template/module/filter.tpl">
+		<operation>
+      <search><![CDATA[$('#button-filter').on('click', function() {]]></search>
+      <add position="replace" offset="8"><![CDATA[
+$('#button-filter').on('click', function() {
+	furl='';
+	$('ul.box-filter > li > ul').each(function(e) {
+		id=$(this).attr('id');
+		f=[]
+		$(this).find('input[name^=\'filter\']:checked').each(function(e) {
+			f.push(this.value);
+		});
+		if(f.length>0) {
+			furl = furl + '&' + id + '=' + f.join(',');
+		}
+	});
+	/*$('input[name^=\'filter\']:checked').each(function(element) {
+		filter.push(this.value);
+	});*/
+	location = '<?php echo $action; ?>' + furl;
+});
+]]></add>
+		</operation>
+	</file>
+</modification>
